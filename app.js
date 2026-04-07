@@ -1,11 +1,11 @@
-const monthNames = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const weekdayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const legendItems = [
-  { label: 'Dia valido de pratica', className: 'phase', color: '#12b76a' },
+  { label: 'Dia de prática', className: 'phase', color: '#16a34a' },
   { label: 'Feriado', className: 'block-holiday', color: '#f59e0b' },
   { label: 'Recesso', className: 'block-recess', color: '#ef4444' },
   { label: 'Folga administrativa', className: 'block-admin-leave', color: '#0f62fe' },
-  { label: 'Acao pedagogica', className: 'block-training', color: '#8b5cf6' }
+  { label: 'Ação pedagógica', className: 'block-training', color: '#8b5cf6' }
 ];
 
 const state = {
@@ -21,10 +21,12 @@ const els = {};
 document.addEventListener('DOMContentLoaded', () => {
   bindElements();
   bindEvents();
+  loadTheme();
   setDefaultStartDate();
   renderLegend();
   renderMonthlyQuotaInputs();
   refreshBlockList();
+  updateQuotaPanelVisibility();
   updateSummary();
 });
 
@@ -32,9 +34,9 @@ function bindElements() {
   [
     'clientName', 'unitName', 'userName', 'startDate', 'hoursPerDay', 'totalHours', 'calculationMode',
     'blockType', 'blockDescription', 'blockStart', 'blockEnd', 'blockList', 'monthlyQuotaContainer',
-    'btnAddBlock', 'btnGenerate', 'btnReset', 'btnExport', 'btnExportPdf', 'btnLoadSample', 'quotaFile',
-    'calendarLegend', 'calendarMount', 'reportMount', 'sumPhaseDays', 'sumHoursPerDay', 'sumTotalHours',
-    'sumEndDate', 'heroTotalDias', 'heroDataFim'
+    'btnAddBlock', 'btnGenerate', 'btnReset', 'btnExportPdf', 'calendarLegend', 'calendarMount',
+    'reportMount', 'sumPhaseDays', 'sumHoursPerDay', 'sumTotalHours', 'sumEndDate', 'heroTotalDias',
+    'heroDataFim', 'themeToggle', 'quotaPanel'
   ].forEach((id) => { els[id] = document.getElementById(id); });
 }
 
@@ -42,13 +44,31 @@ function bindEvents() {
   els.btnAddBlock.addEventListener('click', addBlock);
   els.btnGenerate.addEventListener('click', generateSchedule);
   els.btnReset.addEventListener('click', resetAll);
-  els.btnExport.addEventListener('click', exportJson);
   els.btnExportPdf.addEventListener('click', exportPdf);
-  els.btnLoadSample.addEventListener('click', loadSample);
-  els.quotaFile.addEventListener('change', importQuotaFile);
+  els.calculationMode.addEventListener('change', updateQuotaPanelVisibility);
+  els.themeToggle.addEventListener('click', toggleTheme);
   document.querySelectorAll('.tab').forEach((button) => {
     button.addEventListener('click', () => switchTab(button.dataset.tab));
   });
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem('fase-pratica-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  syncThemeButton();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('fase-pratica-theme', next);
+  syncThemeButton();
+}
+
+function syncThemeButton() {
+  const theme = document.documentElement.getAttribute('data-theme');
+  els.themeToggle.textContent = theme === 'dark' ? '☀️ Tema claro' : '🌙 Tema escuro';
 }
 
 function setDefaultStartDate() {
@@ -61,16 +81,21 @@ function renderLegend() {
   `).join('');
 }
 
+function updateQuotaPanelVisibility() {
+  const monthlyMode = els.calculationMode.value === 'monthly-quota';
+  els.quotaPanel.open = monthlyMode;
+}
+
 function renderMonthlyQuotaInputs() {
-  const currentYear = new Date().getFullYear();
+  const initialYear = new Date(els.startDate?.value || new Date()).getFullYear();
   const months = [];
-  for (let year = currentYear; year <= currentYear + 2; year += 1) {
+  for (let year = initialYear; year <= initialYear + 2; year += 1) {
     for (let month = 0; month < 12; month += 1) {
       const key = `${year}-${String(month + 1).padStart(2, '0')}`;
       months.push(`
         <div class="quota-item">
           <label>${monthNames[month]} ${year}
-            <input type="number" min="0" data-quota-key="${key}" value="${state.monthlyQuotas[key] ?? ''}" placeholder="Dias do mes" />
+            <input type="number" min="0" data-quota-key="${key}" value="${state.monthlyQuotas[key] ?? ''}" placeholder="Dias no mês" />
           </label>
         </div>
       `);
@@ -88,11 +113,16 @@ function renderMonthlyQuotaInputs() {
 function addBlock() {
   const start = els.blockStart.value;
   if (!start) {
-    alert('Informe a data inicial do bloqueio.');
+    alert('Informe a data inicial da pausa.');
     return;
   }
 
   const end = els.blockEnd.value || start;
+  if (end < start) {
+    alert('A data final não pode ser menor que a data inicial.');
+    return;
+  }
+
   state.blocks.push({
     type: els.blockType.value,
     description: els.blockDescription.value.trim() || friendlyBlockType(els.blockType.value),
@@ -106,10 +136,15 @@ function addBlock() {
   refreshBlockList();
 }
 
+function removeBlock(index) {
+  state.blocks.splice(index, 1);
+  refreshBlockList();
+}
+
 function refreshBlockList() {
   if (!state.blocks.length) {
     els.blockList.className = 'tag-list empty-state';
-    els.blockList.textContent = 'Nenhum bloqueio cadastrado.';
+    els.blockList.textContent = 'Nenhuma pausa cadastrada.';
     return;
   }
 
@@ -117,61 +152,62 @@ function refreshBlockList() {
   els.blockList.innerHTML = state.blocks.map((block, index) => `
     <div class="block-item">
       <div class="block-meta">
-        <strong>${block.description}</strong>
-        <small>${friendlyBlockType(block.type)} • ${formatDateBR(block.start)} a ${formatDateBR(block.end)}</small>
+        <strong>${escapeHtml(block.description)}</strong>
+        <small>${friendlyBlockType(block.type)} • ${formatDateBR(block.start)} até ${formatDateBR(block.end)}</small>
       </div>
-      <button class="secondary-btn" onclick="removeBlock(${index})">Remover</button>
+      <button class="secondary-btn icon-btn" type="button" data-remove-block="${index}" aria-label="Remover">✕</button>
     </div>
   `).join('');
-}
 
-window.removeBlock = (index) => {
-  state.blocks.splice(index, 1);
-  refreshBlockList();
-};
+  els.blockList.querySelectorAll('[data-remove-block]').forEach((button) => {
+    button.addEventListener('click', () => removeBlock(Number(button.dataset.removeBlock)));
+  });
+}
 
 function generateSchedule() {
   const startDate = els.startDate.value;
   const hoursPerDay = Number(els.hoursPerDay.value || 0);
   const totalHours = Number(els.totalHours.value || 0);
+  const mode = els.calculationMode.value;
 
-  if (!startDate || hoursPerDay <= 0 || totalHours <= 0) {
-    alert('Preencha inicio, horas por dia e carga horaria.');
+  if (!startDate) {
+    alert('Informe a data de início da fase prática.');
+    return;
+  }
+  if (hoursPerDay <= 0 || totalHours <= 0) {
+    alert('Informe horas por dia e carga horária total maiores que zero.');
     return;
   }
 
-  readQuotaInputs();
-  const mode = els.calculationMode.value;
-  state.phaseDays = mode === 'monthly-quota'
-    ? calculateByMonthlyQuota(startDate, totalHours, hoursPerDay)
-    : calculateAutomatic(startDate, totalHours, hoursPerDay);
-
-  if (!state.phaseDays.length) {
-    alert('Nenhum dia foi gerado. Verifique as cotas mensais ou os bloqueios informados.');
+  let phaseDays = [];
+  if (mode === 'monthly-quota') {
+    phaseDays = calculateMonthlyQuotaDays(startDate, totalHours, hoursPerDay);
+  } else {
+    phaseDays = calculateAutomaticDays(startDate, totalHours, hoursPerDay);
   }
 
-  state.endDate = state.phaseDays.length ? state.phaseDays[state.phaseDays.length - 1] : null;
-  state.reportRows = buildMonthlyReport(state.phaseDays, hoursPerDay);
+  if (!phaseDays.length) {
+    alert('Não foi possível calcular dias de prática com as regras informadas.');
+    return;
+  }
+
+  state.phaseDays = phaseDays;
+  state.endDate = phaseDays[phaseDays.length - 1];
+  state.reportRows = buildMonthlyReport(phaseDays, hoursPerDay);
 
   renderCalendar();
   renderReport(hoursPerDay, totalHours, mode);
   updateSummary(hoursPerDay, totalHours);
+  switchTab('calendar');
 }
 
-function readQuotaInputs() {
-  els.monthlyQuotaContainer.querySelectorAll('input[data-quota-key]').forEach((input) => {
-    const value = input.value.trim();
-    state.monthlyQuotas[input.dataset.quotaKey] = value === '' ? '' : Number(value);
-  });
-}
-
-function calculateAutomatic(startDate, totalHours, hoursPerDay) {
+function calculateAutomaticDays(startDate, totalHours, hoursPerDay) {
   const requiredDays = Math.ceil(totalHours / hoursPerDay);
   const result = [];
   const cursor = new Date(`${startDate}T00:00:00`);
   let safe = 0;
 
-  while (result.length < requiredDays && safe < 4000) {
+  while (result.length < requiredDays && safe < 5000) {
     if (isValidPracticeDay(cursor)) result.push(fmtDate(cursor));
     cursor.setDate(cursor.getDate() + 1);
     safe += 1;
@@ -179,23 +215,35 @@ function calculateAutomatic(startDate, totalHours, hoursPerDay) {
   return result;
 }
 
-function calculateByMonthlyQuota(startDate, totalHours, hoursPerDay) {
+function calculateMonthlyQuotaDays(startDate, totalHours, hoursPerDay) {
   const requiredDays = Math.ceil(totalHours / hoursPerDay);
   const result = [];
+  const usedByMonth = {};
   const cursor = new Date(`${startDate}T00:00:00`);
   let safe = 0;
-  const usedByMonth = {};
 
-  while (result.length < requiredDays && safe < 4000) {
+  while (result.length < requiredDays && safe < 5000) {
     const key = monthKey(cursor);
-    const quota = Number(state.monthlyQuotas[key] || 0);
+    const configured = Number(state.monthlyQuotas[key] || 0);
     const used = usedByMonth[key] || 0;
-    if (quota > used && isValidPracticeDay(cursor)) {
+
+    if (configured > used && isValidPracticeDay(cursor)) {
       result.push(fmtDate(cursor));
       usedByMonth[key] = used + 1;
     }
+
     cursor.setDate(cursor.getDate() + 1);
     safe += 1;
+  }
+
+  const totalConfigured = Object.values(state.monthlyQuotas)
+    .map((value) => Number(value || 0))
+    .reduce((sum, value) => sum + value, 0);
+
+  if (!result.length || result.length < requiredDays) {
+    const requiredMessage = `São necessários ${requiredDays} dias de prática.`;
+    const configuredMessage = `Você configurou ${totalConfigured} dia(s) nos meses personalizados.`;
+    alert(`${requiredMessage} ${configuredMessage} Ajuste as cotas mensais e gere novamente.`);
   }
 
   return result;
@@ -214,7 +262,7 @@ function findBlockForDate(dateStr) {
 function renderCalendar() {
   if (!state.phaseDays.length) {
     els.calendarMount.className = 'calendar-mount empty-state';
-    els.calendarMount.textContent = 'Nenhum dia calculado.';
+    els.calendarMount.innerHTML = 'Nenhum dia calculado.';
     return;
   }
 
@@ -249,13 +297,13 @@ function renderMonthCard({ year, month }) {
     if (current.getDay() === 0 || current.getDay() === 6) classes.push('weekend');
     if (isPhase) classes.push('phase');
     if (block) classes.push(`block-${block.type}`);
-    const title = block ? block.description : isPhase ? 'Pratica' : '';
-    daysHtml += `<div class="${classes.join(' ')}" title="${title}">${day}</div>`;
+    const title = block ? block.description : isPhase ? 'Dia de prática' : '';
+    daysHtml += `<div class="${classes.join(' ')}" title="${escapeHtml(title)}">${day}</div>`;
   }
 
   const metaText = els.calculationMode.value === 'monthly-quota'
-    ? `Dias de pratica no mes: <strong>${monthlyCount}</strong> / cota: <strong>${configuredQuota}</strong>`
-    : `Dias de pratica no mes: <strong>${monthlyCount}</strong>`;
+    ? `Dias no mês: <strong>${monthlyCount}</strong> • previsto: <strong>${configuredQuota}</strong>`
+    : `Dias no mês: <strong>${monthlyCount}</strong>`;
 
   return `
     <article class="month-card">
@@ -268,32 +316,38 @@ function renderMonthCard({ year, month }) {
 }
 
 function renderReport(hoursPerDay, totalHours, mode) {
-  const client = els.clientName.value.trim() || 'Nao informado';
-  const unit = els.unitName.value.trim() || 'Nao informada';
-  const user = els.userName.value.trim() || 'Nao informado';
+  const client = escapeHtml(els.clientName.value.trim() || 'Não informado');
+  const unit = escapeHtml(els.unitName.value.trim() || 'Não informada');
+  const user = escapeHtml(els.userName.value.trim() || 'Não informado');
   const rows = state.reportRows.map((row) => `
     <tr>
-      <td>${row.month}</td>
+      <td>${escapeHtml(row.month)}</td>
       <td>${row.days}</td>
       <td>${row.hours}</td>
     </tr>
   `).join('');
+  const blocksHtml = state.blocks.length
+    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} — ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} até ${formatDateBR(block.end)})</li>`).join('')}</ul>`
+    : '<p>Nenhuma pausa cadastrada.</p>';
 
   els.reportMount.className = 'report-box';
   els.reportMount.innerHTML = `
-    <h3>Relatorio do contrato</h3>
-    <p>
-      <strong>Cliente:</strong> ${client}<br>
-      <strong>Unidade:</strong> ${unit}<br>
-      <strong>Aprendiz:</strong> ${user}<br>
-      <strong>Modo:</strong> ${mode === 'monthly-quota' ? 'Manual por cotas mensais' : 'Automatico por dias uteis'}<br>
-      <strong>Periodo:</strong> ${state.phaseDays[0] ? formatDateBR(state.phaseDays[0]) : '--'} ate ${state.endDate ? formatDateBR(state.endDate) : '--'}
-    </p>
+    <h3>Resumo do contrato</h3>
+    <div class="report-meta">
+      <div><strong>Aprendiz:</strong> ${user}</div>
+      <div><strong>Empresa:</strong> ${client}</div>
+      <div><strong>Unidade:</strong> ${unit}</div>
+      <div><strong>Modo:</strong> ${mode === 'monthly-quota' ? 'Calendário personalizado por mês' : 'Automático por dias úteis'}</div>
+      <div><strong>Período:</strong> ${state.phaseDays[0] ? formatDateBR(state.phaseDays[0]) : '--'} até ${state.endDate ? formatDateBR(state.endDate) : '--'}</div>
+      <div><strong>Total previsto:</strong> ${state.phaseDays.length} dias / ${totalHours} horas</div>
+    </div>
+    <h4>Distribuição por mês</h4>
     <table>
-      <thead><tr><th>Mes</th><th>Dias</th><th>Horas</th></tr></thead>
+      <thead><tr><th>Mês</th><th>Dias</th><th>Horas</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <p><strong>Total:</strong> ${state.phaseDays.length} dias / ${totalHours} horas</p>
+    <h4>Pausas cadastradas</h4>
+    ${blocksHtml}
   `;
 }
 
@@ -336,29 +390,12 @@ function groupMonthsBetween(start, end) {
     output[year].push({ year, month: cursor.getMonth() });
     cursor.setMonth(cursor.getMonth() + 1);
   }
-
   return output;
-}
-
-function exportJson() {
-  const payload = {
-    clientName: els.clientName.value,
-    unitName: els.unitName.value,
-    userName: els.userName.value,
-    startDate: els.startDate.value,
-    hoursPerDay: Number(els.hoursPerDay.value || 0),
-    totalHours: Number(els.totalHours.value || 0),
-    calculationMode: els.calculationMode.value,
-    blocks: state.blocks,
-    monthlyQuotas: state.monthlyQuotas,
-    phaseDays: state.phaseDays,
-  };
-  downloadFile('fase-pratica-config.json', JSON.stringify(payload, null, 2), 'application/json');
 }
 
 async function exportPdf() {
   if (!state.phaseDays.length) {
-    alert('Gere o calendario antes de exportar o PDF.');
+    alert('Gere o calendário antes de baixar o PDF.');
     return;
   }
 
@@ -373,14 +410,16 @@ async function exportPdf() {
     const canvas = await window.html2canvas(printable, {
       scale: 2,
       useCORS: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      scrollX: 0,
+      scrollY: 0
     });
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
+    const margin = 8;
     const usableWidth = pageWidth - margin * 2;
     const usableHeight = pageHeight - margin * 2;
 
@@ -402,7 +441,7 @@ async function exportPdf() {
       if (pageIndex > 0) pdf.addPage();
       const imgData = pageCanvas.toDataURL('image/png');
       const imgHeightMm = (sliceHeight * usableWidth) / canvasWidth;
-      pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, imgHeightMm);
+      pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, imgHeightMm, undefined, 'FAST');
 
       renderedHeight += sliceHeight;
       pageIndex += 1;
@@ -414,7 +453,7 @@ async function exportPdf() {
     pdf.save(`calendario-fase-pratica-${safeUser}-${safeClient}.pdf`);
   } catch (error) {
     console.error(error);
-    alert('Nao foi possivel gerar o PDF.');
+    alert('Não foi possível gerar o PDF.');
   } finally {
     const existing = document.getElementById('printableExportRoot');
     if (existing) existing.remove();
@@ -428,15 +467,12 @@ function buildPrintableNode() {
   root.id = 'printableExportRoot';
   root.className = 'print-root';
 
-  const client = escapeHtml(els.clientName.value.trim() || 'Nao informado');
-  const unit = escapeHtml(els.unitName.value.trim() || 'Nao informada');
-  const user = escapeHtml(els.userName.value.trim() || 'Nao informado');
-  const mode = els.calculationMode.value === 'monthly-quota' ? 'Manual por cotas mensais' : 'Automatico por dias uteis';
+  const client = escapeHtml(els.clientName.value.trim() || 'Não informado');
+  const unit = escapeHtml(els.unitName.value.trim() || 'Não informada');
+  const user = escapeHtml(els.userName.value.trim() || 'Não informado');
+  const mode = els.calculationMode.value === 'monthly-quota' ? 'Calendário personalizado por mês' : 'Automático por dias úteis';
   const periodStart = state.phaseDays[0] ? formatDateBR(state.phaseDays[0]) : '--';
   const periodEnd = state.endDate ? formatDateBR(state.endDate) : '--';
-  const blocksHtml = state.blocks.length
-    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} - ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} a ${formatDateBR(block.end)})</li>`).join('')}</ul>`
-    : '<p>Nenhum bloqueio cadastrado.</p>';
   const rows = state.reportRows.map((row) => `
     <tr>
       <td>${escapeHtml(row.month)}</td>
@@ -444,82 +480,75 @@ function buildPrintableNode() {
       <td>${row.hours}</td>
     </tr>
   `).join('');
+  const blocksHtml = state.blocks.length
+    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} — ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} até ${formatDateBR(block.end)})</li>`).join('')}</ul>`
+    : '<p>Nenhuma pausa cadastrada.</p>';
 
   root.innerHTML = `
-    <div class="print-page">
-      <div class="print-header">
-        <h1>Calendario de Fase Pratica</h1>
-        <p>SENAI - Planejamento de contrato do aprendiz</p>
+    <div class="print-page print-cover">
+      <div class="print-banner">
+        <h1>Planejamento da Fase Prática</h1>
+        <p>SENAI • Calendário do jovem aprendiz</p>
       </div>
+
+      <div class="print-cards">
+        <div class="print-card"><span>Dias de prática</span><strong>${state.phaseDays.length}</strong></div>
+        <div class="print-card"><span>Carga horária</span><strong>${Number(els.totalHours.value || 0)} h</strong></div>
+        <div class="print-card"><span>Data final</span><strong>${periodEnd}</strong></div>
+      </div>
+
       <div class="print-grid">
-        <div><strong>Cliente:</strong> ${client}</div>
-        <div><strong>Unidade:</strong> ${unit}</div>
-        <div><strong>Aprendiz:</strong> ${user}</div>
-        <div><strong>Modo:</strong> ${mode}</div>
-        <div><strong>Periodo:</strong> ${periodStart} ate ${periodEnd}</div>
-        <div><strong>Total:</strong> ${state.phaseDays.length} dias / ${Number(els.totalHours.value || 0)} horas</div>
+        <section class="print-panel">
+          <h2>Dados do contrato</h2>
+          <p><strong>Aprendiz:</strong> ${user}</p>
+          <p><strong>Empresa / Cliente:</strong> ${client}</p>
+          <p><strong>Unidade SENAI:</strong> ${unit}</p>
+          <p><strong>Modo de cálculo:</strong> ${mode}</p>
+          <p><strong>Período:</strong> ${periodStart} até ${periodEnd}</p>
+          <p><strong>Horas por dia:</strong> ${Number(els.hoursPerDay.value || 0)} h</p>
+        </section>
+
+        <section class="print-panel">
+          <h2>Passo a passo de leitura</h2>
+          <ol>
+            <li>Confira os dados do aprendiz e da empresa.</li>
+            <li>Revise a distribuição de dias por mês.</li>
+            <li>Verifique as pausas cadastradas.</li>
+            <li>Use o calendário completo nas próximas páginas.</li>
+          </ol>
+        </section>
       </div>
-      <div class="print-section">
-        <h2>Resumo por mes</h2>
+
+      <section class="print-panel">
+        <h2>Resumo por mês</h2>
         <table class="print-table">
-          <thead><tr><th>Mes</th><th>Dias</th><th>Horas</th></tr></thead>
+          <thead><tr><th>Mês</th><th>Dias</th><th>Horas</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-      </div>
-      <div class="print-section">
-        <h2>Bloqueios e excecoes</h2>
+      </section>
+
+      <section class="print-panel">
+        <h2>Pausas cadastradas</h2>
         ${blocksHtml}
-      </div>
-      <div class="print-section">
+      </section>
+
+      <section class="print-panel">
         <h2>Legenda</h2>
         <div class="print-legend">${legendItems.map((item) => `<span><i style="background:${item.color}"></i>${item.label}</span>`).join('')}</div>
-      </div>
+      </section>
+
+      <p class="print-footnote">Documento gerado automaticamente pela Calculadora de Fase Prática.</p>
     </div>
+
     <div class="print-page">
-      <div class="print-section">
-        <h2>Calendario completo</h2>
+      <section class="print-panel">
+        <h2>Calendário completo</h2>
         ${els.calendarMount.innerHTML}
-      </div>
+      </section>
     </div>
   `;
 
   return root;
-}
-
-async function loadSample() {
-  const response = await fetch('data/sample-calendar.json');
-  const data = await response.json();
-  applyImportedData(data);
-}
-
-function importQuotaFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result);
-      applyImportedData(data);
-    } catch (error) {
-      alert('Arquivo JSON invalido.');
-    }
-  };
-  reader.readAsText(file, 'utf-8');
-}
-
-function applyImportedData(data) {
-  state.blocks = data.blocks || [];
-  state.monthlyQuotas = data.monthlyQuotas || {};
-  els.clientName.value = data.clientName || '';
-  els.unitName.value = data.unitName || '';
-  els.userName.value = data.userName || '';
-  els.startDate.value = data.startDate || els.startDate.value;
-  els.hoursPerDay.value = data.hoursPerDay || 4;
-  els.totalHours.value = data.totalHours || 200;
-  els.calculationMode.value = data.calculationMode || 'monthly-quota';
-  refreshBlockList();
-  renderMonthlyQuotaInputs();
 }
 
 function resetAll() {
@@ -538,11 +567,12 @@ function resetAll() {
   setDefaultStartDate();
   refreshBlockList();
   renderMonthlyQuotaInputs();
+  updateQuotaPanelVisibility();
 
   els.calendarMount.className = 'calendar-mount empty-state';
-  els.calendarMount.textContent = 'Configure os parametros e gere o calendario.';
+  els.calendarMount.innerHTML = 'Preencha os dados e clique em <strong>Gerar calendário</strong>.';
   els.reportMount.className = 'report-box empty-state';
-  els.reportMount.textContent = 'O relatorio sera exibido aqui.';
+  els.reportMount.textContent = 'O resumo do contrato será exibido aqui.';
   updateSummary();
 }
 
@@ -556,7 +586,7 @@ function friendlyBlockType(type) {
     holiday: 'Feriado',
     recess: 'Recesso',
     'admin-leave': 'Folga administrativa',
-    training: 'Acao pedagogica',
+    training: 'Ação pedagógica',
   }[type] || type;
 }
 
@@ -589,14 +619,4 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function downloadFile(name, content, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
 }

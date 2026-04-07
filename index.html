@@ -1,42 +1,69 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Calculadora de Fase Prática | SENAI</title>
+  <meta name="description" content="Ferramenta para planejamento da fase prática de jovens aprendizes." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app-shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">SENAI • Aprendizagem Profissional</p>
-        <h1>Calculadora de Fase Prática</h1>
-        <p class="hero-text">
-          Planeje contratos, marque dias válidos de prática e compare o cálculo automático com um calendário específico mensal.
-        </p>
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">
+          <span>S</span>
+        </div>
+        <div>
+          <p class="eyebrow">SENAI • Aprendizagem Profissional</p>
+          <h1>Calculadora de Fase Prática</h1>
+          <p class="hero-text">Monte o calendário da fase prática, confira a data final e gere um PDF pronto para envio.</p>
+        </div>
       </div>
-      <div class="hero-card">
-        <div class="hero-metric"><strong id="heroTotalDias">0</strong><span>Dias válidos</span></div>
-        <div class="hero-metric"><strong id="heroDataFim">--</strong><span>Data final</span></div>
+
+      <div class="topbar-actions">
+        <button id="themeToggle" class="ghost-btn" type="button" aria-label="Alternar tema">🌙 Tema escuro</button>
       </div>
     </header>
 
+    <section class="hero-strip">
+      <article class="hero-metric">
+        <span>Dias de prática</span>
+        <strong id="heroTotalDias">0</strong>
+      </article>
+      <article class="hero-metric">
+        <span>Data final</span>
+        <strong id="heroDataFim">--</strong>
+      </article>
+      <article class="hero-metric">
+        <span>PDF</span>
+        <strong>Pronto</strong>
+      </article>
+    </section>
+
     <main class="layout">
       <section class="panel controls-panel">
-        <h2>Parâmetros</h2>
+        <div class="section-title">
+          <div>
+            <p class="section-kicker">Preenchimento</p>
+            <h2>1. Dados principais</h2>
+          </div>
+          <span class="badge">Modo simples</span>
+        </div>
+
         <div class="grid two">
           <label>
-            Nome do cliente
+            Nome do aprendiz
+            <input id="userName" type="text" placeholder="Ex.: João da Silva" />
+          </label>
+          <label>
+            Empresa / Cliente
             <input id="clientName" type="text" placeholder="Ex.: Empresa Alfa" />
           </label>
           <label>
             Unidade SENAI
-            <input id="unitName" type="text" placeholder="Ex.: Cimatec / Dendezeiros" />
-          </label>
-          <label>
-            Nome do aprendiz
-            <input id="userName" type="text" placeholder="Ex.: João da Silva" />
+            <input id="unitName" type="text" placeholder="Ex.: Dendezeiros" />
           </label>
           <label>
             Início da fase prática
@@ -51,32 +78,35 @@
             <input id="totalHours" type="number" min="1" step="1" value="200" />
           </label>
           <label class="full-width">
-            Modo de cálculo
+            Forma de cálculo
             <select id="calculationMode">
               <option value="automatic">Automático por dias úteis</option>
-              <option value="monthly-quota">Manual por cotas mensais</option>
+              <option value="monthly-quota">Calendário personalizado por mês</option>
             </select>
           </label>
         </div>
 
-        <div class="subpanel">
-          <div class="subpanel-header">
-            <h3>Bloqueios e exceções</h3>
-            <button class="secondary-btn" id="btnAddBlock">Adicionar bloqueio</button>
-          </div>
-          <div class="grid two compact">
+        <details class="subpanel" open>
+          <summary>
+            <span>
+              <strong>2. Dias não trabalhados</strong>
+              <small>Cadastre feriados, recessos ou outras pausas.</small>
+            </span>
+          </summary>
+
+          <div class="grid two compact spacing-top">
             <label>
               Tipo
               <select id="blockType">
                 <option value="holiday">Feriado</option>
                 <option value="recess">Recesso</option>
                 <option value="admin-leave">Folga administrativa</option>
-                <option value="training">Encontro / ação pedagógica</option>
+                <option value="training">Ação pedagógica</option>
               </select>
             </label>
             <label>
               Descrição
-              <input id="blockDescription" type="text" placeholder="Descrição do bloqueio" />
+              <input id="blockDescription" type="text" placeholder="Ex.: São João" />
             </label>
             <label>
               Data inicial
@@ -87,31 +117,39 @@
               <input id="blockEnd" type="date" />
             </label>
           </div>
-          <div id="blockList" class="tag-list empty-state">Nenhum bloqueio cadastrado.</div>
-        </div>
 
-        <div class="subpanel">
-          <div class="subpanel-header">
-            <h3>Cotas mensais do calendário específico</h3>
-            <div class="inline-actions">
-              <button class="secondary-btn" id="btnLoadSample">Carregar exemplo</button>
-              <label class="upload-btn">
-                Importar JSON
-                <input id="quotaFile" type="file" accept="application/json" hidden />
-              </label>
-            </div>
+          <div class="inline-actions spacing-top">
+            <button class="secondary-btn" id="btnAddBlock" type="button">Adicionar pausa</button>
           </div>
-          <p class="helper-text">
-            Use este modo quando houver um calendário validado com quantidade de dias de prática marcada mês a mês.
-          </p>
-          <div id="monthlyQuotaContainer" class="quota-grid"></div>
-        </div>
+
+          <div id="blockList" class="tag-list empty-state spacing-top">Nenhuma pausa cadastrada.</div>
+        </details>
+
+        <details class="subpanel" id="quotaPanel">
+          <summary>
+            <span>
+              <strong>3. Calendário personalizado por mês</strong>
+              <small>Use quando já houver quantidade de dias definida em cada mês.</small>
+            </span>
+          </summary>
+          <p class="helper-text spacing-top">Preencha apenas os meses que terão dias de prática.</p>
+          <div id="monthlyQuotaContainer" class="quota-grid spacing-top"></div>
+        </details>
+
+        <section class="subpanel guide-panel">
+          <h3>4. Como usar</h3>
+          <ol class="guide-list">
+            <li>Preencha os dados do aprendiz, empresa e carga horária.</li>
+            <li>Cadastre as pausas, quando houver.</li>
+            <li>Clique em <strong>Gerar calendário</strong>.</li>
+            <li>Confira o resultado e clique em <strong>Baixar PDF</strong>.</li>
+          </ol>
+        </section>
 
         <div class="actions">
-          <button id="btnGenerate">Gerar calendário</button>
-          <button id="btnReset" class="danger">Limpar</button>
-          <button id="btnExport" class="secondary">Exportar JSON</button>
-          <button id="btnExportPdf" class="secondary">Exportar PDF</button>
+          <button id="btnGenerate" type="button">Gerar calendário</button>
+          <button id="btnExportPdf" class="secondary" type="button">Baixar PDF</button>
+          <button id="btnReset" class="danger" type="button">Limpar dados</button>
         </div>
       </section>
 
@@ -136,21 +174,17 @@
         </div>
 
         <div class="tabs">
-          <button class="tab active" data-tab="calendar">Calendário</button>
-          <button class="tab" data-tab="report">Relatório</button>
+          <button class="tab active" data-tab="calendar" type="button">Calendário</button>
+          <button class="tab" data-tab="report" type="button">Resumo</button>
         </div>
 
         <div class="tab-content active" id="tab-calendar">
           <div id="calendarLegend" class="legend"></div>
-          <div id="calendarMount" class="calendar-mount empty-state">
-            Configure os parâmetros e gere o calendário.
-          </div>
+          <div id="calendarMount" class="calendar-mount empty-state">Preencha os dados e clique em <strong>Gerar calendário</strong>.</div>
         </div>
 
         <div class="tab-content" id="tab-report">
-          <div id="reportMount" class="report-box empty-state">
-            O relatório será exibido aqui.
-          </div>
+          <div id="reportMount" class="report-box empty-state">O resumo do contrato será exibido aqui.</div>
         </div>
       </section>
     </main>
