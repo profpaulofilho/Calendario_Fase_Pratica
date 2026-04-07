@@ -12,13 +12,11 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand-block">
-        <div class="brand-mark" aria-hidden="true">
-          <span>S</span>
-        </div>
+        <div class="brand-mark" aria-hidden="true"><span>S</span></div>
         <div>
           <p class="eyebrow">SENAI • Aprendizagem Profissional</p>
           <h1>Calculadora de Fase Prática</h1>
-          <p class="hero-text">Monte o calendário da fase prática, confira a data final e gere um PDF pronto para envio.</p>
+          <p class="hero-text">Preencha os dados, aplique bloqueios quando necessário, gere o calendário e baixe o PDF.</p>
         </div>
       </div>
 
@@ -38,7 +36,7 @@
       </article>
       <article class="hero-metric">
         <span>PDF</span>
-        <strong>Pronto</strong>
+        <strong>Disponível</strong>
       </article>
     </section>
 
@@ -49,13 +47,13 @@
             <p class="section-kicker">Preenchimento</p>
             <h2>1. Dados principais</h2>
           </div>
-          <span class="badge">Modo simples</span>
+          <button id="modeToggle" class="badge badge-btn" type="button">Modo simples</button>
         </div>
 
         <div class="grid two">
           <label>
-            Nome do aprendiz
-            <input id="userName" type="text" placeholder="Ex.: João da Silva" />
+            Nome de quem preenche a ficha
+            <input id="fillerName" type="text" placeholder="Ex.: José da Silva" />
           </label>
           <label>
             Empresa / Cliente
@@ -77,7 +75,7 @@
             Carga horária total
             <input id="totalHours" type="number" min="1" step="1" value="200" />
           </label>
-          <label class="full-width">
+          <label class="full-width advanced-only">
             Forma de cálculo
             <select id="calculationMode">
               <option value="automatic">Automático por dias úteis</option>
@@ -86,13 +84,11 @@
           </label>
         </div>
 
-        <details class="subpanel" open>
-          <summary>
-            <span>
-              <strong>2. Dias não trabalhados</strong>
-              <small>Cadastre feriados, recessos ou outras pausas.</small>
-            </span>
-          </summary>
+        <section class="subpanel" open>
+          <div>
+            <strong>2. Bloqueios</strong>
+            <small>Cadastre feriados, recessos ou outras pausas.</small>
+          </div>
 
           <div class="grid two compact spacing-top">
             <label>
@@ -106,7 +102,7 @@
             </label>
             <label>
               Descrição
-              <input id="blockDescription" type="text" placeholder="Ex.: São João" />
+              <input id="blockDescription" type="text" placeholder="Ex.: Tiradentes" />
             </label>
             <label>
               Data inicial
@@ -119,28 +115,26 @@
           </div>
 
           <div class="inline-actions spacing-top">
-            <button class="secondary-btn" id="btnAddBlock" type="button">Adicionar pausa</button>
+            <button class="secondary-btn" id="btnAddBlock" type="button">Adicionar bloqueio</button>
           </div>
 
-          <div id="blockList" class="tag-list empty-state spacing-top">Nenhuma pausa cadastrada.</div>
-        </details>
+          <div id="blockList" class="tag-list empty-state spacing-top">Nenhum bloqueio cadastrado.</div>
+        </section>
 
-        <details class="subpanel" id="quotaPanel">
-          <summary>
-            <span>
-              <strong>3. Calendário personalizado por mês</strong>
-              <small>Use quando já houver quantidade de dias definida em cada mês.</small>
-            </span>
-          </summary>
+        <section class="subpanel advanced-only" id="quotaPanel">
+          <div>
+            <strong>3. Calendário personalizado por mês</strong>
+            <small>Use quando já houver quantidade de dias definida em cada mês.</small>
+          </div>
           <p class="helper-text spacing-top">Preencha apenas os meses que terão dias de prática.</p>
           <div id="monthlyQuotaContainer" class="quota-grid spacing-top"></div>
-        </details>
+        </section>
 
         <section class="subpanel guide-panel">
           <h3>4. Como usar</h3>
           <ol class="guide-list">
-            <li>Preencha os dados do aprendiz, empresa e carga horária.</li>
-            <li>Cadastre as pausas, quando houver.</li>
+            <li>Preencha os dados principais.</li>
+            <li>Cadastre os bloqueios quando houver.</li>
             <li>Clique em <strong>Gerar calendário</strong>.</li>
             <li>Confira o resultado e clique em <strong>Baixar PDF</strong>.</li>
           </ol>
@@ -188,6 +182,8 @@
         </div>
       </section>
     </main>
+
+    <footer class="app-footer">Desenvolvido por Paulo da Silva Filho - Especialista em TI - GEP - BAHIA- 2026</footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>

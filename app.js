@@ -1,14 +1,15 @@
-const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const monthNames = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const weekdayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const legendItems = [
-  { label: 'Dia de prática', className: 'phase', color: '#16a34a' },
+  { label: 'Dia de pratica', className: 'phase', color: '#16a34a' },
   { label: 'Feriado', className: 'block-holiday', color: '#f59e0b' },
   { label: 'Recesso', className: 'block-recess', color: '#ef4444' },
   { label: 'Folga administrativa', className: 'block-admin-leave', color: '#0f62fe' },
-  { label: 'Ação pedagógica', className: 'block-training', color: '#8b5cf6' }
+  { label: 'Acao pedagogica', className: 'block-training', color: '#8b5cf6' }
 ];
 
 const state = {
+  uiMode: 'simple',
   blocks: [],
   monthlyQuotas: {},
   phaseDays: [],
@@ -22,21 +23,23 @@ document.addEventListener('DOMContentLoaded', () => {
   bindElements();
   bindEvents();
   loadTheme();
+  loadUiMode();
   setDefaultStartDate();
   renderLegend();
   renderMonthlyQuotaInputs();
   refreshBlockList();
+  applyUiMode();
   updateQuotaPanelVisibility();
   updateSummary();
 });
 
 function bindElements() {
   [
-    'clientName', 'unitName', 'userName', 'startDate', 'hoursPerDay', 'totalHours', 'calculationMode',
+    'fillerName', 'clientName', 'unitName', 'startDate', 'hoursPerDay', 'totalHours', 'calculationMode',
     'blockType', 'blockDescription', 'blockStart', 'blockEnd', 'blockList', 'monthlyQuotaContainer',
     'btnAddBlock', 'btnGenerate', 'btnReset', 'btnExportPdf', 'calendarLegend', 'calendarMount',
     'reportMount', 'sumPhaseDays', 'sumHoursPerDay', 'sumTotalHours', 'sumEndDate', 'heroTotalDias',
-    'heroDataFim', 'themeToggle', 'quotaPanel'
+    'heroDataFim', 'themeToggle', 'quotaPanel', 'modeToggle'
   ].forEach((id) => { els[id] = document.getElementById(id); });
 }
 
@@ -47,6 +50,8 @@ function bindEvents() {
   els.btnExportPdf.addEventListener('click', exportPdf);
   els.calculationMode.addEventListener('change', updateQuotaPanelVisibility);
   els.themeToggle.addEventListener('click', toggleTheme);
+  els.modeToggle.addEventListener('click', toggleUiMode);
+  els.startDate.addEventListener('change', renderMonthlyQuotaInputs);
   document.querySelectorAll('.tab').forEach((button) => {
     button.addEventListener('click', () => switchTab(button.dataset.tab));
   });
@@ -67,35 +72,61 @@ function toggleTheme() {
 }
 
 function syncThemeButton() {
-  const theme = document.documentElement.getAttribute('data-theme');
-  els.themeToggle.textContent = theme === 'dark' ? '☀️ Tema claro' : '🌙 Tema escuro';
+  const theme = document.documentElement.getAttribute('data-theme') || 'light';
+  els.themeToggle.textContent = theme === 'dark' ? '☀ Tema claro' : '🌙 Tema escuro';
+}
+
+function loadUiMode() {
+  state.uiMode = localStorage.getItem('fase-pratica-ui-mode') || 'simple';
+}
+
+function toggleUiMode() {
+  state.uiMode = state.uiMode === 'simple' ? 'advanced' : 'simple';
+  localStorage.setItem('fase-pratica-ui-mode', state.uiMode);
+  applyUiMode();
+}
+
+function applyUiMode() {
+  const isAdvanced = state.uiMode === 'advanced';
+  document.body.classList.toggle('ui-advanced', isAdvanced);
+  document.querySelectorAll('.advanced-only').forEach((node) => {
+    node.style.display = isAdvanced ? '' : 'none';
+  });
+  if (!isAdvanced) {
+    els.calculationMode.value = 'automatic';
+  }
+  els.modeToggle.textContent = isAdvanced ? 'Modo avançado' : 'Modo simples';
+  updateQuotaPanelVisibility();
 }
 
 function setDefaultStartDate() {
-  els.startDate.value = fmtDate(new Date());
+  if (!els.startDate.value) {
+    els.startDate.value = fmtDate(new Date());
+  }
 }
 
 function renderLegend() {
-  els.calendarLegend.innerHTML = legendItems.map((item) => `
-    <span><i class="swatch" style="background:${item.color}"></i>${item.label}</span>
-  `).join('');
+  els.calendarLegend.innerHTML = legendItems.map((item) => (
+    `<span><i class="swatch" style="background:${item.color}"></i>${item.label}</span>`
+  )).join('');
 }
 
 function updateQuotaPanelVisibility() {
-  const monthlyMode = els.calculationMode.value === 'monthly-quota';
-  els.quotaPanel.open = monthlyMode;
+  const shouldShow = state.uiMode === 'advanced' && els.calculationMode.value === 'monthly-quota';
+  els.quotaPanel.style.display = shouldShow ? '' : 'none';
 }
 
 function renderMonthlyQuotaInputs() {
-  const initialYear = new Date(els.startDate?.value || new Date()).getFullYear();
+  const initialYear = new Date(`${els.startDate.value || fmtDate(new Date())}T00:00:00`).getFullYear();
   const months = [];
   for (let year = initialYear; year <= initialYear + 2; year += 1) {
     for (let month = 0; month < 12; month += 1) {
       const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const value = state.monthlyQuotas[key] ?? '';
       months.push(`
         <div class="quota-item">
           <label>${monthNames[month]} ${year}
-            <input type="number" min="0" data-quota-key="${key}" value="${state.monthlyQuotas[key] ?? ''}" placeholder="Dias no mês" />
+            <input type="number" min="0" data-quota-key="${key}" value="${value}" placeholder="Dias no mes" />
           </label>
         </div>
       `);
@@ -104,8 +135,8 @@ function renderMonthlyQuotaInputs() {
   els.monthlyQuotaContainer.innerHTML = months.join('');
   els.monthlyQuotaContainer.querySelectorAll('input').forEach((input) => {
     input.addEventListener('input', () => {
-      const value = input.value.trim();
-      state.monthlyQuotas[input.dataset.quotaKey] = value === '' ? '' : Number(value);
+      const raw = input.value.trim();
+      state.monthlyQuotas[input.dataset.quotaKey] = raw === '' ? '' : Number(raw);
     });
   });
 }
@@ -113,23 +144,24 @@ function renderMonthlyQuotaInputs() {
 function addBlock() {
   const start = els.blockStart.value;
   if (!start) {
-    alert('Informe a data inicial da pausa.');
+    alert('Informe a data inicial do bloqueio.');
     return;
   }
 
   const end = els.blockEnd.value || start;
   if (end < start) {
-    alert('A data final não pode ser menor que a data inicial.');
+    alert('A data final do bloqueio nao pode ser menor que a data inicial.');
     return;
   }
 
   state.blocks.push({
     type: els.blockType.value,
-    description: els.blockDescription.value.trim() || friendlyBlockType(els.blockType.value),
+    description: (els.blockDescription.value || '').trim() || friendlyBlockType(els.blockType.value),
     start,
     end,
   });
   state.blocks.sort((a, b) => a.start.localeCompare(b.start));
+
   els.blockDescription.value = '';
   els.blockStart.value = '';
   els.blockEnd.value = '';
@@ -144,7 +176,7 @@ function removeBlock(index) {
 function refreshBlockList() {
   if (!state.blocks.length) {
     els.blockList.className = 'tag-list empty-state';
-    els.blockList.textContent = 'Nenhuma pausa cadastrada.';
+    els.blockList.textContent = 'Nenhum bloqueio cadastrado.';
     return;
   }
 
@@ -153,9 +185,9 @@ function refreshBlockList() {
     <div class="block-item">
       <div class="block-meta">
         <strong>${escapeHtml(block.description)}</strong>
-        <small>${friendlyBlockType(block.type)} • ${formatDateBR(block.start)} até ${formatDateBR(block.end)}</small>
+        <small>${friendlyBlockType(block.type)} • ${formatDateBR(block.start)} ate ${formatDateBR(block.end)}</small>
       </div>
-      <button class="secondary-btn icon-btn" type="button" data-remove-block="${index}" aria-label="Remover">✕</button>
+      <button class="secondary-btn icon-btn" type="button" data-remove-block="${index}" aria-label="Remover bloqueio">✕</button>
     </div>
   `).join('');
 
@@ -168,14 +200,14 @@ function generateSchedule() {
   const startDate = els.startDate.value;
   const hoursPerDay = Number(els.hoursPerDay.value || 0);
   const totalHours = Number(els.totalHours.value || 0);
-  const mode = els.calculationMode.value;
+  const mode = state.uiMode === 'advanced' ? els.calculationMode.value : 'automatic';
 
   if (!startDate) {
-    alert('Informe a data de início da fase prática.');
+    alert('Informe a data de inicio da fase pratica.');
     return;
   }
   if (hoursPerDay <= 0 || totalHours <= 0) {
-    alert('Informe horas por dia e carga horária total maiores que zero.');
+    alert('Informe horas por dia e carga horaria total maiores que zero.');
     return;
   }
 
@@ -187,7 +219,7 @@ function generateSchedule() {
   }
 
   if (!phaseDays.length) {
-    alert('Não foi possível calcular dias de prática com as regras informadas.');
+    alert('Nao foi possivel calcular os dias de pratica com as regras informadas.');
     return;
   }
 
@@ -234,16 +266,26 @@ function calculateMonthlyQuotaDays(startDate, totalHours, hoursPerDay) {
 
     cursor.setDate(cursor.getDate() + 1);
     safe += 1;
+
+    const totalConfigured = Object.values(state.monthlyQuotas)
+      .map((value) => Number(value || 0))
+      .reduce((sum, value) => sum + value, 0);
+
+    if (totalConfigured > 0 && totalConfigured === result.length) break;
   }
 
   const totalConfigured = Object.values(state.monthlyQuotas)
     .map((value) => Number(value || 0))
     .reduce((sum, value) => sum + value, 0);
 
-  if (!result.length || result.length < requiredDays) {
-    const requiredMessage = `São necessários ${requiredDays} dias de prática.`;
-    const configuredMessage = `Você configurou ${totalConfigured} dia(s) nos meses personalizados.`;
-    alert(`${requiredMessage} ${configuredMessage} Ajuste as cotas mensais e gere novamente.`);
+  if (totalConfigured < requiredDays) {
+    alert(`As cotas mensais somam ${totalConfigured} dia(s), mas sao necessarios ${requiredDays} dia(s). Complete as cotas mensais.`);
+    return [];
+  }
+
+  if (result.length < requiredDays) {
+    alert('Nao foi possivel encaixar todos os dias previstos nas cotas mensais informadas.');
+    return [];
   }
 
   return result;
@@ -256,7 +298,7 @@ function isValidPracticeDay(date) {
 }
 
 function findBlockForDate(dateStr) {
-  return state.blocks.find((block) => dateStr >= block.start && dateStr <= block.end);
+  return state.blocks.find((block) => dateStr >= block.start && dateStr <= block.end) || null;
 }
 
 function renderCalendar() {
@@ -266,8 +308,8 @@ function renderCalendar() {
     return;
   }
 
-  els.calendarMount.className = 'calendar-mount';
   const grouped = groupMonthsBetween(state.phaseDays[0], state.phaseDays[state.phaseDays.length - 1]);
+  els.calendarMount.className = 'calendar-mount';
   els.calendarMount.innerHTML = Object.entries(grouped).map(([year, months]) => `
     <section class="calendar-year">
       <h3>${year}</h3>
@@ -297,13 +339,13 @@ function renderMonthCard({ year, month }) {
     if (current.getDay() === 0 || current.getDay() === 6) classes.push('weekend');
     if (isPhase) classes.push('phase');
     if (block) classes.push(`block-${block.type}`);
-    const title = block ? block.description : isPhase ? 'Dia de prática' : '';
+    const title = block ? `${friendlyBlockType(block.type)} - ${block.description}` : (isPhase ? 'Dia de pratica' : '');
     daysHtml += `<div class="${classes.join(' ')}" title="${escapeHtml(title)}">${day}</div>`;
   }
 
-  const metaText = els.calculationMode.value === 'monthly-quota'
-    ? `Dias no mês: <strong>${monthlyCount}</strong> • previsto: <strong>${configuredQuota}</strong>`
-    : `Dias no mês: <strong>${monthlyCount}</strong>`;
+  const metaText = state.uiMode === 'advanced' && els.calculationMode.value === 'monthly-quota'
+    ? `Dias no mes: <strong>${monthlyCount}</strong> • previsto: <strong>${configuredQuota}</strong>`
+    : `Dias no mes: <strong>${monthlyCount}</strong>`;
 
   return `
     <article class="month-card">
@@ -316,42 +358,38 @@ function renderMonthCard({ year, month }) {
 }
 
 function renderReport(hoursPerDay, totalHours, mode) {
-  const client = escapeHtml(els.clientName.value.trim() || 'Não informado');
-  const unit = escapeHtml(els.unitName.value.trim() || 'Não informada');
-  const user = escapeHtml(els.userName.value.trim() || 'Não informado');
+  const filler = escapeHtml((els.fillerName.value || '').trim() || 'Nao informado');
+  const client = escapeHtml((els.clientName.value || '').trim() || 'Nao informado');
+  const unit = escapeHtml((els.unitName.value || '').trim() || 'Nao informada');
   const rows = state.reportRows.map((row) => `
-    <tr>
-      <td>${escapeHtml(row.month)}</td>
-      <td>${row.days}</td>
-      <td>${row.hours}</td>
-    </tr>
+    <tr><td>${escapeHtml(row.month)}</td><td>${row.days}</td><td>${row.hours}</td></tr>
   `).join('');
   const blocksHtml = state.blocks.length
-    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} — ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} até ${formatDateBR(block.end)})</li>`).join('')}</ul>`
-    : '<p>Nenhuma pausa cadastrada.</p>';
+    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} - ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} ate ${formatDateBR(block.end)})</li>`).join('')}</ul>`
+    : '<p>Nenhum bloqueio cadastrado.</p>';
 
   els.reportMount.className = 'report-box';
   els.reportMount.innerHTML = `
-    <h3>Resumo do contrato</h3>
-    <div class="report-meta">
-      <div><strong>Aprendiz:</strong> ${user}</div>
+    <div class="report-header-grid">
+      <div><strong>Preenchido por:</strong> ${filler}</div>
       <div><strong>Empresa:</strong> ${client}</div>
       <div><strong>Unidade:</strong> ${unit}</div>
-      <div><strong>Modo:</strong> ${mode === 'monthly-quota' ? 'Calendário personalizado por mês' : 'Automático por dias úteis'}</div>
-      <div><strong>Período:</strong> ${state.phaseDays[0] ? formatDateBR(state.phaseDays[0]) : '--'} até ${state.endDate ? formatDateBR(state.endDate) : '--'}</div>
+      <div><strong>Modo:</strong> ${mode === 'monthly-quota' ? 'Calendario personalizado por mes' : 'Automatico por dias uteis'}</div>
+      <div><strong>Periodo:</strong> ${formatDateBR(state.phaseDays[0])} ate ${formatDateBR(state.endDate)}</div>
       <div><strong>Total previsto:</strong> ${state.phaseDays.length} dias / ${totalHours} horas</div>
+      <div><strong>Horas por dia:</strong> ${hoursPerDay} h</div>
     </div>
-    <h4>Distribuição por mês</h4>
+    <h4>Distribuicao por mes</h4>
     <table>
-      <thead><tr><th>Mês</th><th>Dias</th><th>Horas</th></tr></thead>
+      <thead><tr><th>Mes</th><th>Dias</th><th>Horas</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <h4>Pausas cadastradas</h4>
+    <h4>Bloqueios cadastrados</h4>
     ${blocksHtml}
   `;
 }
 
-function updateSummary(hoursPerDay = Number(els.hoursPerDay?.value || 0), totalHours = Number(els.totalHours?.value || 0)) {
+function updateSummary(hoursPerDay = Number(els.hoursPerDay.value || 0), totalHours = Number(els.totalHours.value || 0)) {
   els.sumPhaseDays.textContent = state.phaseDays.length || '--';
   els.sumHoursPerDay.textContent = hoursPerDay || '--';
   els.sumTotalHours.textContent = totalHours || '--';
@@ -386,7 +424,7 @@ function groupMonthsBetween(start, end) {
 
   while (cursor <= limit) {
     const year = cursor.getFullYear();
-    output[year] ||= [];
+    if (!output[year]) output[year] = [];
     output[year].push({ year, month: cursor.getMonth() });
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -395,7 +433,11 @@ function groupMonthsBetween(start, end) {
 
 async function exportPdf() {
   if (!state.phaseDays.length) {
-    alert('Gere o calendário antes de baixar o PDF.');
+    alert('Gere o calendario antes de baixar o PDF.');
+    return;
+  }
+  if (!window.html2canvas || !window.jspdf) {
+    alert('As bibliotecas do PDF nao foram carregadas. Verifique sua conexao e tente novamente.');
     return;
   }
 
@@ -412,7 +454,9 @@ async function exportPdf() {
       useCORS: true,
       backgroundColor: '#ffffff',
       scrollX: 0,
-      scrollY: 0
+      scrollY: 0,
+      windowWidth: printable.scrollWidth,
+      windowHeight: printable.scrollHeight,
     });
 
     const { jsPDF } = window.jspdf;
@@ -422,25 +466,21 @@ async function exportPdf() {
     const margin = 8;
     const usableWidth = pageWidth - margin * 2;
     const usableHeight = pageHeight - margin * 2;
-
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
-    const pageHeightInCanvas = Math.floor((usableHeight * canvasWidth) / usableWidth);
+    const pageHeightInCanvas = Math.floor((usableHeight * canvas.width) / usableWidth);
 
     let renderedHeight = 0;
     let pageIndex = 0;
-
-    while (renderedHeight < canvasHeight) {
-      const sliceHeight = Math.min(pageHeightInCanvas, canvasHeight - renderedHeight);
+    while (renderedHeight < canvas.height) {
+      const sliceHeight = Math.min(pageHeightInCanvas, canvas.height - renderedHeight);
       const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvasWidth;
+      pageCanvas.width = canvas.width;
       pageCanvas.height = sliceHeight;
       const ctx = pageCanvas.getContext('2d');
-      ctx.drawImage(canvas, 0, renderedHeight, canvasWidth, sliceHeight, 0, 0, canvasWidth, sliceHeight);
+      ctx.drawImage(canvas, 0, renderedHeight, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
 
       if (pageIndex > 0) pdf.addPage();
       const imgData = pageCanvas.toDataURL('image/png');
-      const imgHeightMm = (sliceHeight * usableWidth) / canvasWidth;
+      const imgHeightMm = (sliceHeight * usableWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, imgHeightMm, undefined, 'FAST');
 
       renderedHeight += sliceHeight;
@@ -448,12 +488,12 @@ async function exportPdf() {
     }
 
     printable.remove();
-    const safeUser = sanitizeFilePart(els.userName.value || 'aprendiz');
+    const safeFiller = sanitizeFilePart(els.fillerName.value || 'ficha');
     const safeClient = sanitizeFilePart(els.clientName.value || 'cliente');
-    pdf.save(`calendario-fase-pratica-${safeUser}-${safeClient}.pdf`);
+    pdf.save(`calendario-fase-pratica-${safeFiller}-${safeClient}.pdf`);
   } catch (error) {
     console.error(error);
-    alert('Não foi possível gerar o PDF.');
+    alert('Nao foi possivel gerar o PDF.');
   } finally {
     const existing = document.getElementById('printableExportRoot');
     if (existing) existing.remove();
@@ -467,82 +507,63 @@ function buildPrintableNode() {
   root.id = 'printableExportRoot';
   root.className = 'print-root';
 
-  const client = escapeHtml(els.clientName.value.trim() || 'Não informado');
-  const unit = escapeHtml(els.unitName.value.trim() || 'Não informada');
-  const user = escapeHtml(els.userName.value.trim() || 'Não informado');
-  const mode = els.calculationMode.value === 'monthly-quota' ? 'Calendário personalizado por mês' : 'Automático por dias úteis';
+  const filler = escapeHtml((els.fillerName.value || '').trim() || 'Nao informado');
+  const client = escapeHtml((els.clientName.value || '').trim() || 'Nao informado');
+  const unit = escapeHtml((els.unitName.value || '').trim() || 'Nao informada');
+  const mode = state.uiMode === 'advanced' && els.calculationMode.value === 'monthly-quota'
+    ? 'Calendario personalizado por mes'
+    : 'Automatico por dias uteis';
   const periodStart = state.phaseDays[0] ? formatDateBR(state.phaseDays[0]) : '--';
   const periodEnd = state.endDate ? formatDateBR(state.endDate) : '--';
   const rows = state.reportRows.map((row) => `
-    <tr>
-      <td>${escapeHtml(row.month)}</td>
-      <td>${row.days}</td>
-      <td>${row.hours}</td>
-    </tr>
+    <tr><td>${escapeHtml(row.month)}</td><td>${row.days}</td><td>${row.hours}</td></tr>
   `).join('');
   const blocksHtml = state.blocks.length
-    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} — ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} até ${formatDateBR(block.end)})</li>`).join('')}</ul>`
-    : '<p>Nenhuma pausa cadastrada.</p>';
+    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} - ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} ate ${formatDateBR(block.end)})</li>`).join('')}</ul>`
+    : '<p>Nenhum bloqueio cadastrado.</p>';
 
   root.innerHTML = `
     <div class="print-page print-cover">
       <div class="print-banner">
-        <h1>Planejamento da Fase Prática</h1>
-        <p>SENAI • Calendário do jovem aprendiz</p>
+        <h1>Planejamento da Fase Pratica</h1>
+        <p>SENAI • Calendario de acompanhamento</p>
       </div>
-
       <div class="print-cards">
-        <div class="print-card"><span>Dias de prática</span><strong>${state.phaseDays.length}</strong></div>
-        <div class="print-card"><span>Carga horária</span><strong>${Number(els.totalHours.value || 0)} h</strong></div>
+        <div class="print-card"><span>Dias de pratica</span><strong>${state.phaseDays.length}</strong></div>
+        <div class="print-card"><span>Carga horaria</span><strong>${Number(els.totalHours.value || 0)} h</strong></div>
         <div class="print-card"><span>Data final</span><strong>${periodEnd}</strong></div>
       </div>
-
       <div class="print-grid">
         <section class="print-panel">
-          <h2>Dados do contrato</h2>
-          <p><strong>Aprendiz:</strong> ${user}</p>
+          <h2>Dados da ficha</h2>
+          <p><strong>Preenchido por:</strong> ${filler}</p>
           <p><strong>Empresa / Cliente:</strong> ${client}</p>
           <p><strong>Unidade SENAI:</strong> ${unit}</p>
-          <p><strong>Modo de cálculo:</strong> ${mode}</p>
-          <p><strong>Período:</strong> ${periodStart} até ${periodEnd}</p>
+          <p><strong>Modo de calculo:</strong> ${mode}</p>
+          <p><strong>Periodo:</strong> ${periodStart} ate ${periodEnd}</p>
           <p><strong>Horas por dia:</strong> ${Number(els.hoursPerDay.value || 0)} h</p>
         </section>
-
         <section class="print-panel">
-          <h2>Passo a passo de leitura</h2>
-          <ol>
-            <li>Confira os dados do aprendiz e da empresa.</li>
-            <li>Revise a distribuição de dias por mês.</li>
-            <li>Verifique as pausas cadastradas.</li>
-            <li>Use o calendário completo nas próximas páginas.</li>
-          </ol>
+          <h2>Resumo por mes</h2>
+          <table class="print-table">
+            <thead><tr><th>Mes</th><th>Dias</th><th>Horas</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
         </section>
       </div>
-
       <section class="print-panel">
-        <h2>Resumo por mês</h2>
-        <table class="print-table">
-          <thead><tr><th>Mês</th><th>Dias</th><th>Horas</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </section>
-
-      <section class="print-panel">
-        <h2>Pausas cadastradas</h2>
+        <h2>Bloqueios cadastrados</h2>
         ${blocksHtml}
       </section>
-
       <section class="print-panel">
         <h2>Legenda</h2>
         <div class="print-legend">${legendItems.map((item) => `<span><i style="background:${item.color}"></i>${item.label}</span>`).join('')}</div>
       </section>
-
-      <p class="print-footnote">Documento gerado automaticamente pela Calculadora de Fase Prática.</p>
+      <p class="print-footnote">Desenvolvido por Paulo da Silva Filho - Especialista em TI - GEP - BAHIA- 2026</p>
     </div>
-
     <div class="print-page">
       <section class="print-panel">
-        <h2>Calendário completo</h2>
+        <h2>Calendario completo</h2>
         ${els.calendarMount.innerHTML}
       </section>
     </div>
@@ -558,21 +579,24 @@ function resetAll() {
   state.reportRows = [];
   state.endDate = null;
 
+  els.fillerName.value = '';
   els.clientName.value = '';
   els.unitName.value = '';
-  els.userName.value = '';
   els.hoursPerDay.value = 4;
   els.totalHours.value = 200;
   els.calculationMode.value = 'automatic';
+  els.blockDescription.value = '';
+  els.blockStart.value = '';
+  els.blockEnd.value = '';
   setDefaultStartDate();
   refreshBlockList();
   renderMonthlyQuotaInputs();
-  updateQuotaPanelVisibility();
+  applyUiMode();
 
   els.calendarMount.className = 'calendar-mount empty-state';
-  els.calendarMount.innerHTML = 'Preencha os dados e clique em <strong>Gerar calendário</strong>.';
+  els.calendarMount.innerHTML = 'Preencha os dados e clique em <strong>Gerar calendario</strong>.';
   els.reportMount.className = 'report-box empty-state';
-  els.reportMount.textContent = 'O resumo do contrato será exibido aqui.';
+  els.reportMount.textContent = 'O resumo do contrato sera exibido aqui.';
   updateSummary();
 }
 
@@ -586,7 +610,7 @@ function friendlyBlockType(type) {
     holiday: 'Feriado',
     recess: 'Recesso',
     'admin-leave': 'Folga administrativa',
-    training: 'Ação pedagógica',
+    training: 'Acao pedagogica',
   }[type] || type;
 }
 
