@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de Fase Prática | SENAI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">SENAI • Aprendizagem Profissional</p>
+        <h1>Calculadora de Fase Prática</h1>
+        <p class="hero-text">
+          Planeje contratos, marque dias válidos de prática e compare o cálculo automático com um calendário específico mensal.
+        </p>
+      </div>
+      <div class="hero-card">
+        <div class="hero-metric"><strong id="heroTotalDias">0</strong><span>Dias válidos</span></div>
+        <div class="hero-metric"><strong id="heroDataFim">--</strong><span>Data final</span></div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel controls-panel">
+        <h2>Parâmetros</h2>
+        <div class="grid two">
+          <label>
+            Nome do cliente
+            <input id="clientName" type="text" placeholder="Ex.: Empresa Alfa" />
+          </label>
+          <label>
+            Unidade SENAI
+            <input id="unitName" type="text" placeholder="Ex.: Cimatec / Dendezeiros" />
+          </label>
+          <label>
+            Início da fase prática
+            <input id="startDate" type="date" />
+          </label>
+          <label>
+            Horas por dia
+            <input id="hoursPerDay" type="number" min="1" max="12" value="4" />
+          </label>
+          <label>
+            Carga horária total
+            <input id="totalHours" type="number" min="1" step="1" value="200" />
+          </label>
+          <label>
+            Modo de cálculo
+            <select id="calculationMode">
+              <option value="automatic">Automático por dias úteis</option>
+              <option value="monthly-quota">Manual por cotas mensais</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="subpanel">
+          <div class="subpanel-header">
+            <h3>Bloqueios e exceções</h3>
+            <button class="secondary-btn" id="btnAddBlock">Adicionar bloqueio</button>
+          </div>
+          <div class="grid two compact">
+            <label>
+              Tipo
+              <select id="blockType">
+                <option value="holiday">Feriado</option>
+                <option value="recess">Recesso</option>
+                <option value="admin-leave">Folga administrativa</option>
+                <option value="training">Encontro / ação pedagógica</option>
+              </select>
+            </label>
+            <label>
+              Descrição
+              <input id="blockDescription" type="text" placeholder="Descrição do bloqueio" />
+            </label>
+            <label>
+              Data inicial
+              <input id="blockStart" type="date" />
+            </label>
+            <label>
+              Data final
+              <input id="blockEnd" type="date" />
+            </label>
+          </div>
+          <div id="blockList" class="tag-list empty-state">Nenhum bloqueio cadastrado.</div>
+        </div>
+
+        <div class="subpanel">
+          <div class="subpanel-header">
+            <h3>Cotas mensais do calendário específico</h3>
+            <div class="inline-actions">
+              <button class="secondary-btn" id="btnLoadSample">Carregar exemplo</button>
+              <label class="upload-btn">
+                Importar JSON
+                <input id="quotaFile" type="file" accept="application/json" hidden />
+              </label>
+            </div>
+          </div>
+          <p class="helper-text">
+            Use este modo quando houver um calendário validado com quantidade de dias de prática marcada mês a mês.
+          </p>
+          <div id="monthlyQuotaContainer" class="quota-grid"></div>
+        </div>
+
+        <div class="actions">
+          <button id="btnGenerate">Gerar calendário</button>
+          <button id="btnReset" class="danger">Limpar</button>
+          <button id="btnExport" class="secondary">Exportar JSON</button>
+        </div>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="summary-grid" id="summaryGrid">
+          <article>
+            <span>Dias de prática</span>
+            <strong id="sumPhaseDays">--</strong>
+          </article>
+          <article>
+            <span>Horas por dia</span>
+            <strong id="sumHoursPerDay">--</strong>
+          </article>
+          <article>
+            <span>Carga horária</span>
+            <strong id="sumTotalHours">--</strong>
+          </article>
+          <article>
+            <span>Data final</span>
+            <strong id="sumEndDate">--</strong>
+          </article>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="calendar">Calendário</button>
+          <button class="tab" data-tab="report">Relatório</button>
+        </div>
+
+        <div class="tab-content active" id="tab-calendar">
+          <div id="calendarLegend" class="legend"></div>
+          <div id="calendarMount" class="calendar-mount empty-state">
+            Configure os parâmetros e gere o calendário.
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-report">
+          <div id="reportMount" class="report-box empty-state">
+            O relatório será exibido aqui.
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
