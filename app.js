@@ -371,7 +371,7 @@ function renderReport(hoursPerDay, totalHours, mode) {
   els.reportMount.className = 'report-box';
   els.reportMount.innerHTML = `
     <div class="report-header-grid">
-      <div><strong>Preenchido por:</strong> ${filler}</div>
+      <div><strong>Responsavel pelas informacoes:</strong> ${filler}</div>
       <div><strong>Empresa:</strong> ${client}</div>
       <div><strong>Unidade:</strong> ${unit}</div>
       <div><strong>Modo:</strong> ${mode === 'monthly-quota' ? 'Calendario personalizado por mes' : 'Automatico por dias uteis'}</div>
@@ -446,130 +446,231 @@ async function exportPdf() {
   els.btnExportPdf.textContent = 'Gerando PDF...';
 
   try {
-    const printable = buildPrintableNode();
-    document.body.appendChild(printable);
-
-    const canvas = await window.html2canvas(printable, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: printable.scrollWidth,
-      windowHeight: printable.scrollHeight,
-    });
-
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 8;
-    const usableWidth = pageWidth - margin * 2;
-    const usableHeight = pageHeight - margin * 2;
-    const pageHeightInCanvas = Math.floor((usableHeight * canvas.width) / usableWidth);
+    const margin = 12;
+    const contentWidth = pageWidth - (margin * 2);
+    let y = margin;
 
-    let renderedHeight = 0;
-    let pageIndex = 0;
-    while (renderedHeight < canvas.height) {
-      const sliceHeight = Math.min(pageHeightInCanvas, canvas.height - renderedHeight);
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = sliceHeight;
-      const ctx = pageCanvas.getContext('2d');
-      ctx.drawImage(canvas, 0, renderedHeight, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+    y = drawPdfCover(pdf, margin, contentWidth, y);
+    pdf.addPage();
+    y = margin;
+    y = drawPdfMonthlySummary(pdf, margin, contentWidth, y);
+    y = drawPdfBlocks(pdf, margin, contentWidth, y, pageHeight);
+    await appendCalendarPages(pdf, margin, contentWidth, pageHeight);
 
-      if (pageIndex > 0) pdf.addPage();
-      const imgData = pageCanvas.toDataURL('image/png');
-      const imgHeightMm = (sliceHeight * usableWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, imgHeightMm, undefined, 'FAST');
-
-      renderedHeight += sliceHeight;
-      pageIndex += 1;
-    }
-
-    printable.remove();
     const safeFiller = sanitizeFilePart(els.fillerName.value || 'ficha');
     const safeClient = sanitizeFilePart(els.clientName.value || 'cliente');
     pdf.save(`calendario-fase-pratica-${safeFiller}-${safeClient}.pdf`);
   } catch (error) {
     console.error(error);
-    alert('Nao foi possivel gerar o PDF.');
+    alert(`Nao foi possivel gerar o PDF. ${error && error.message ? error.message : ''}`.trim());
   } finally {
-    const existing = document.getElementById('printableExportRoot');
-    if (existing) existing.remove();
     els.btnExportPdf.disabled = false;
     els.btnExportPdf.textContent = originalText;
   }
 }
 
-function buildPrintableNode() {
-  const root = document.createElement('div');
-  root.id = 'printableExportRoot';
-  root.className = 'print-root';
-
-  const filler = escapeHtml((els.fillerName.value || '').trim() || 'Nao informado');
-  const client = escapeHtml((els.clientName.value || '').trim() || 'Nao informado');
-  const unit = escapeHtml((els.unitName.value || '').trim() || 'Nao informada');
+function drawPdfCover(pdf, margin, contentWidth, y) {
+  const filler = (els.fillerName.value || '').trim() || 'Nao informado';
+  const client = (els.clientName.value || '').trim() || 'Nao informado';
+  const unit = (els.unitName.value || '').trim() || 'Nao informada';
   const mode = state.uiMode === 'advanced' && els.calculationMode.value === 'monthly-quota'
     ? 'Calendario personalizado por mes'
     : 'Automatico por dias uteis';
   const periodStart = state.phaseDays[0] ? formatDateBR(state.phaseDays[0]) : '--';
   const periodEnd = state.endDate ? formatDateBR(state.endDate) : '--';
-  const rows = state.reportRows.map((row) => `
-    <tr><td>${escapeHtml(row.month)}</td><td>${row.days}</td><td>${row.hours}</td></tr>
-  `).join('');
-  const blocksHtml = state.blocks.length
-    ? `<ul>${state.blocks.map((block) => `<li>${escapeHtml(block.description)} - ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} ate ${formatDateBR(block.end)})</li>`).join('')}</ul>`
-    : '<p>Nenhum bloqueio cadastrado.</p>';
 
-  root.innerHTML = `
-    <div class="print-page print-cover">
-      <div class="print-banner">
-        <h1>Planejamento da Fase Pratica</h1>
-        <p>SENAI • Calendario de acompanhamento</p>
-      </div>
-      <div class="print-cards">
-        <div class="print-card"><span>Dias de pratica</span><strong>${state.phaseDays.length}</strong></div>
-        <div class="print-card"><span>Carga horaria</span><strong>${Number(els.totalHours.value || 0)} h</strong></div>
-        <div class="print-card"><span>Data final</span><strong>${periodEnd}</strong></div>
-      </div>
-      <div class="print-grid">
-        <section class="print-panel">
-          <h2>Dados da ficha</h2>
-          <p><strong>Preenchido por:</strong> ${filler}</p>
-          <p><strong>Empresa / Cliente:</strong> ${client}</p>
-          <p><strong>Unidade SENAI:</strong> ${unit}</p>
-          <p><strong>Modo de calculo:</strong> ${mode}</p>
-          <p><strong>Periodo:</strong> ${periodStart} ate ${periodEnd}</p>
-          <p><strong>Horas por dia:</strong> ${Number(els.hoursPerDay.value || 0)} h</p>
-        </section>
-        <section class="print-panel">
-          <h2>Resumo por mes</h2>
-          <table class="print-table">
-            <thead><tr><th>Mes</th><th>Dias</th><th>Horas</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </section>
-      </div>
-      <section class="print-panel">
-        <h2>Bloqueios cadastrados</h2>
-        ${blocksHtml}
-      </section>
-      <section class="print-panel">
-        <h2>Legenda</h2>
-        <div class="print-legend">${legendItems.map((item) => `<span><i style="background:${item.color}"></i>${item.label}</span>`).join('')}</div>
-      </section>
-      <p class="print-footnote">Desenvolvido por Paulo da Silva Filho - Especialista em TI - GEP - BAHIA- 2026</p>
-    </div>
-    <div class="print-page">
-      <section class="print-panel">
-        <h2>Calendario completo</h2>
-        ${els.calendarMount.innerHTML}
-      </section>
-    </div>
-  `;
+  pdf.setFillColor(15, 98, 254);
+  pdf.roundedRect(margin, y, contentWidth, 28, 4, 4, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(20);
+  pdf.text('Planejamento da Fase Pratica', margin + 6, y + 11);
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('SENAI - Calendario de acompanhamento', margin + 6, y + 19);
+  y += 36;
 
-  return root;
+  const cards = [
+    ['Dias de pratica', String(state.phaseDays.length)],
+    ['Carga horaria', `${Number(els.totalHours.value || 0)} h`],
+    ['Data final', periodEnd],
+  ];
+  const gap = 4;
+  const cardWidth = (contentWidth - gap * 2) / 3;
+  cards.forEach((card, index) => {
+    const x = margin + ((cardWidth + gap) * index);
+    pdf.setDrawColor(209, 213, 219);
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(x, y, cardWidth, 22, 3, 3, 'FD');
+    pdf.setTextColor(107, 114, 128);
+    pdf.setFontSize(9);
+    pdf.text(card[0], x + 4, y + 7);
+    pdf.setTextColor(17, 24, 39);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(15);
+    pdf.text(card[1], x + 4, y + 16);
+  });
+  y += 30;
+
+  y = drawDetailBox(pdf, margin, y, contentWidth, 'Dados da ficha', [
+    ['Responsavel pelas informacoes', filler],
+    ['Empresa / Cliente', client],
+    ['Unidade SENAI', unit],
+    ['Modo de calculo', mode],
+    ['Periodo', `${periodStart} ate ${periodEnd}`],
+    ['Horas por dia', `${Number(els.hoursPerDay.value || 0)} h`],
+  ]);
+
+  pdf.setTextColor(107, 114, 128);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.text('Desenvolvido por Paulo da Silva Filho - Especialista em TI - GEP - BAHIA- 2026', margin, 285);
+  return y;
+}
+
+function drawPdfMonthlySummary(pdf, margin, contentWidth, y) {
+  pdf.setTextColor(17, 24, 39);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text('Resumo por mes', margin, y);
+  y += 6;
+
+  const colX = [margin, margin + 98, margin + 130];
+  pdf.setFillColor(241, 245, 249);
+  pdf.rect(margin, y, contentWidth, 8, 'F');
+  pdf.setFontSize(10);
+  pdf.text('Mes', colX[0] + 2, y + 5.5);
+  pdf.text('Dias', colX[1] + 2, y + 5.5);
+  pdf.text('Horas', colX[2] + 2, y + 5.5);
+  y += 8;
+
+  pdf.setFont('helvetica', 'normal');
+  state.reportRows.forEach((row) => {
+    pdf.setDrawColor(229, 231, 235);
+    pdf.line(margin, y, margin + contentWidth, y);
+    pdf.text(String(row.month), colX[0] + 2, y + 5.5);
+    pdf.text(String(row.days), colX[1] + 2, y + 5.5);
+    pdf.text(String(row.hours), colX[2] + 2, y + 5.5);
+    y += 8;
+  });
+  pdf.line(margin, y, margin + contentWidth, y);
+  return y + 10;
+}
+
+function drawPdfBlocks(pdf, margin, contentWidth, y, pageHeight) {
+  if (y > pageHeight - 40) {
+    pdf.addPage();
+    y = margin;
+  }
+  pdf.setTextColor(17, 24, 39);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(15);
+  pdf.text('Bloqueios cadastrados', margin, y);
+  y += 8;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(10);
+
+  if (!state.blocks.length) {
+    pdf.text('Nenhum bloqueio cadastrado.', margin, y);
+    return y + 8;
+  }
+
+  state.blocks.forEach((block) => {
+    const line = `${block.description} - ${friendlyBlockType(block.type)} (${formatDateBR(block.start)} ate ${formatDateBR(block.end)})`;
+    const lines = pdf.splitTextToSize(line, contentWidth - 6);
+    const neededHeight = (lines.length * 5) + 3;
+    if (y + neededHeight > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+    }
+    pdf.text(lines, margin, y);
+    y += neededHeight;
+  });
+  return y + 6;
+}
+
+async function appendCalendarPages(pdf, margin, contentWidth, pageHeight) {
+  const printableRoot = document.createElement('div');
+  printableRoot.id = 'pdfMonthCaptureRoot';
+  printableRoot.className = 'pdf-capture-root';
+  document.body.appendChild(printableRoot);
+  const previousTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', 'light');
+
+  try {
+    const yearSections = Array.from(els.calendarMount.querySelectorAll('.calendar-year'));
+    for (const section of yearSections) {
+      const yearTitle = section.querySelector('h3') ? section.querySelector('h3').textContent.trim() : '';
+      const monthCards = Array.from(section.querySelectorAll('.month-card'));
+      for (let i = 0; i < monthCards.length; i += 2) {
+        pdf.addPage();
+        let y = margin;
+        pdf.setTextColor(17, 24, 39);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(15);
+        pdf.text(`Calendario completo ${yearTitle}`.trim(), margin, y);
+        y += 8;
+
+        const batch = monthCards.slice(i, i + 2);
+        for (const card of batch) {
+          const clone = card.cloneNode(true);
+          printableRoot.innerHTML = '';
+          printableRoot.appendChild(clone);
+          const canvas = await window.html2canvas(clone, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+          });
+          const imgData = canvas.toDataURL('image/png');
+          const imgHeight = (canvas.height * contentWidth) / canvas.width;
+          if (y + imgHeight > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+          pdf.addImage(imgData, 'PNG', margin, y, contentWidth, imgHeight, undefined, 'FAST');
+          y += imgHeight + 6;
+        }
+      }
+    }
+  } finally {
+    document.documentElement.setAttribute('data-theme', previousTheme);
+    printableRoot.remove();
+  }
+}
+
+function drawDetailBox(pdf, x, y, width, title, rows) {
+  let currentY = y;
+  const rowHeights = rows.map(([, value]) => {
+    const lines = pdf.splitTextToSize(String(value), width - 14);
+    return Math.max(9, lines.length * 4 + 4);
+  });
+  const totalHeight = 12 + rowHeights.reduce((sum, value) => sum + value, 0) + 6;
+
+  pdf.setDrawColor(209, 213, 219);
+  pdf.roundedRect(x, currentY, width, totalHeight, 3, 3, 'S');
+  pdf.setTextColor(17, 24, 39);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(14);
+  pdf.text(title, x + 4, currentY + 8);
+  currentY += 14;
+
+  rows.forEach(([label, value], index) => {
+    const lines = pdf.splitTextToSize(String(value), width - 14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text(`${label}:`, x + 4, currentY);
+    currentY += 4;
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(lines, x + 4, currentY + 2);
+    currentY += rowHeights[index] - 1;
+  });
+
+  return y + totalHeight + 8;
 }
 
 function resetAll() {

@@ -478,3 +478,13 @@ h1 {
 @media (max-width: 720px) {
   .report-header-grid { grid-template-columns: 1fr; }
 }
+
+.pdf-capture-root {
+  position: fixed;
+  left: -99999px;
+  top: 0;
+  width: 1200px;
+  padding: 20px;
+  background: #ffffff;
+  z-index: -1;
+}
