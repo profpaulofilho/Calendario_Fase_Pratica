@@ -73,7 +73,7 @@ function toggleTheme() {
 
 function syncThemeButton() {
   const theme = document.documentElement.getAttribute('data-theme') || 'light';
-  els.themeToggle.textContent = theme === 'dark' ? '☀ Tema claro' : '🌙 Tema escuro';
+  els.themeToggle.textContent = theme === 'dark' ? '☀ Modo claro' : '🌙 Modo escuro';
 }
 
 function loadUiMode() {
@@ -95,7 +95,7 @@ function applyUiMode() {
   if (!isAdvanced) {
     els.calculationMode.value = 'automatic';
   }
-  els.modeToggle.textContent = isAdvanced ? 'Modo avançado' : 'Modo simples';
+  els.modeToggle.textContent = isAdvanced ? 'Modo simples' : 'Modo avançado';
   updateQuotaPanelVisibility();
 }
 
@@ -436,8 +436,8 @@ async function exportPdf() {
     alert('Gere o calendario antes de baixar o PDF.');
     return;
   }
-  if (!window.html2canvas || !window.jspdf) {
-    alert('As bibliotecas do PDF nao foram carregadas. Verifique sua conexao e tente novamente.');
+  if (!window.jspdf) {
+    alert('A biblioteca do PDF nao foi carregada. Verifique sua conexao e tente novamente.');
     return;
   }
 
@@ -457,9 +457,9 @@ async function exportPdf() {
     y = drawPdfCover(pdf, margin, contentWidth, y);
     pdf.addPage();
     y = margin;
-    y = drawPdfMonthlySummary(pdf, margin, contentWidth, y);
+    y = drawPdfMonthlySummary(pdf, margin, contentWidth, y, pageHeight);
     y = drawPdfBlocks(pdf, margin, contentWidth, y, pageHeight);
-    await appendCalendarPages(pdf, margin, contentWidth, pageHeight);
+    appendCalendarPages(pdf, margin, contentWidth, pageHeight);
 
     const safeFiller = sanitizeFilePart(els.fillerName.value || 'ficha');
     const safeClient = sanitizeFilePart(els.clientName.value || 'cliente');
@@ -532,7 +532,7 @@ function drawPdfCover(pdf, margin, contentWidth, y) {
   return y;
 }
 
-function drawPdfMonthlySummary(pdf, margin, contentWidth, y) {
+function drawPdfMonthlySummary(pdf, margin, contentWidth, y, pageHeight) {
   pdf.setTextColor(17, 24, 39);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(15);
@@ -549,7 +549,20 @@ function drawPdfMonthlySummary(pdf, margin, contentWidth, y) {
   y += 8;
 
   pdf.setFont('helvetica', 'normal');
-  state.reportRows.forEach((row) => {
+  state.reportRows.forEach((row, index) => {
+    if (y > pageHeight - 18) {
+      pdf.addPage();
+      y = margin;
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(margin, y, contentWidth, 8, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.text('Mes', colX[0] + 2, y + 5.5);
+      pdf.text('Dias', colX[1] + 2, y + 5.5);
+      pdf.text('Horas', colX[2] + 2, y + 5.5);
+      pdf.setFont('helvetica', 'normal');
+      y += 8;
+    }
     pdf.setDrawColor(229, 231, 235);
     pdf.line(margin, y, margin + contentWidth, y);
     pdf.text(String(row.month), colX[0] + 2, y + 5.5);
@@ -593,54 +606,166 @@ function drawPdfBlocks(pdf, margin, contentWidth, y, pageHeight) {
   return y + 6;
 }
 
-async function appendCalendarPages(pdf, margin, contentWidth, pageHeight) {
-  const printableRoot = document.createElement('div');
-  printableRoot.id = 'pdfMonthCaptureRoot';
-  printableRoot.className = 'pdf-capture-root';
-  document.body.appendChild(printableRoot);
-  const previousTheme = document.documentElement.getAttribute('data-theme') || 'light';
-  document.documentElement.setAttribute('data-theme', 'light');
+function appendCalendarPages(pdf, margin, contentWidth, pageHeight) {
+  const grouped = groupMonthsBetween(state.phaseDays[0], state.phaseDays[state.phaseDays.length - 1]);
+  const months = [];
 
-  try {
-    const yearSections = Array.from(els.calendarMount.querySelectorAll('.calendar-year'));
-    for (const section of yearSections) {
-      const yearTitle = section.querySelector('h3') ? section.querySelector('h3').textContent.trim() : '';
-      const monthCards = Array.from(section.querySelectorAll('.month-card'));
-      for (let i = 0; i < monthCards.length; i += 2) {
-        pdf.addPage();
-        let y = margin;
+  Object.entries(grouped).forEach(([year, items]) => {
+    items.forEach((item) => months.push({ year: Number(year), month: item.month }));
+  });
+
+  for (let i = 0; i < months.length; i += 1) {
+    pdf.addPage();
+    let y = margin;
+    pdf.setTextColor(17, 24, 39);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(15);
+    pdf.text(`Calendario completo ${months[i].year}`, margin, y);
+    y += 8;
+    drawMonthCalendarPdf(pdf, months[i], margin, y, contentWidth, pageHeight - margin - y);
+  }
+}
+
+function drawMonthCalendarPdf(pdf, monthInfo, x, y, width, availableHeight) {
+  const year = monthInfo.year;
+  const month = monthInfo.month;
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const daysInMonth = last.getDate();
+  const startOffset = first.getDay();
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthlyCount = state.phaseDays.filter((date) => date.startsWith(monthPrefix)).length;
+  const configuredQuota = Number(state.monthlyQuotas[monthPrefix] || 0);
+  const isQuotaMode = state.uiMode === 'advanced' && els.calculationMode.value === 'monthly-quota';
+
+  pdf.setDrawColor(209, 213, 219);
+  pdf.setFillColor(255, 255, 255);
+  pdf.roundedRect(x, y, width, availableHeight, 3, 3, 'FD');
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(13);
+  pdf.setTextColor(17, 24, 39);
+  pdf.text(`${monthNames[month]} ${year}`, x + 4, y + 8);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  const metaText = isQuotaMode
+    ? `Dias no mes: ${monthlyCount} | Previsto: ${configuredQuota}`
+    : `Dias no mes: ${monthlyCount}`;
+  pdf.text(metaText, x + 4, y + 14);
+
+  const gridTop = y + 20;
+  const cellW = width / 7;
+  const cellH = 22;
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(9);
+  weekdayNames.forEach((name, index) => {
+    const cellX = x + (index * cellW);
+    pdf.setFillColor(241, 245, 249);
+    pdf.rect(cellX, gridTop, cellW, 8, 'F');
+    pdf.setDrawColor(229, 231, 235);
+    pdf.rect(cellX, gridTop, cellW, 8);
+    pdf.text(name, cellX + 2.5, gridTop + 5.2);
+  });
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  let index = 0;
+  for (let row = 0; row < 6; row += 1) {
+    for (let col = 0; col < 7; col += 1) {
+      const cellX = x + (col * cellW);
+      const cellY = gridTop + 8 + (row * cellH);
+      const dayNumber = index - startOffset + 1;
+      const inMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
+
+      pdf.setDrawColor(229, 231, 235);
+      pdf.setFillColor(255, 255, 255);
+
+      if (inMonth) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+        const block = findBlockForDate(dateStr);
+        const isPhase = state.phaseDays.includes(dateStr);
+        const dayOfWeek = new Date(`${dateStr}T00:00:00`).getDay();
+
+        if (block) {
+          const color = pdfBlockFillColor(block.type);
+          pdf.setFillColor(color[0], color[1], color[2]);
+        } else if (isPhase) {
+          pdf.setFillColor(220, 252, 231);
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+          pdf.setFillColor(248, 250, 252);
+        }
+      } else {
+        pdf.setFillColor(248, 250, 252);
+      }
+
+      pdf.rect(cellX, cellY, cellW, cellH, 'FD');
+
+      if (inMonth) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`;
+        const block = findBlockForDate(dateStr);
+        const isPhase = state.phaseDays.includes(dateStr);
+        const dayOfWeek = new Date(`${dateStr}T00:00:00`).getDay();
+
         pdf.setTextColor(17, 24, 39);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(15);
-        pdf.text(`Calendario completo ${yearTitle}`.trim(), margin, y);
-        y += 8;
+        pdf.text(String(dayNumber), cellX + 2, cellY + 4.5);
 
-        const batch = monthCards.slice(i, i + 2);
-        for (const card of batch) {
-          const clone = card.cloneNode(true);
-          printableRoot.innerHTML = '';
-          printableRoot.appendChild(clone);
-          const canvas = await window.html2canvas(clone, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-          });
-          const imgData = canvas.toDataURL('image/png');
-          const imgHeight = (canvas.height * contentWidth) / canvas.width;
-          if (y + imgHeight > pageHeight - margin) {
-            pdf.addPage();
-            y = margin;
-          }
-          pdf.addImage(imgData, 'PNG', margin, y, contentWidth, imgHeight, undefined, 'FAST');
-          y += imgHeight + 6;
+        if (block) {
+          pdf.setFontSize(6.5);
+          pdf.setTextColor(75, 85, 99);
+          const shortText = pdf.splitTextToSize(friendlyBlockType(block.type), cellW - 3).slice(0, 2);
+          pdf.text(shortText, cellX + 1.5, cellY + 10);
+          pdf.setFontSize(8);
+        } else if (isPhase) {
+          pdf.setFontSize(6.5);
+          pdf.setTextColor(22, 101, 52);
+          pdf.text('Pratica', cellX + 1.5, cellY + 10);
+          pdf.setFontSize(8);
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+          pdf.setFontSize(6.5);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text('Fim de semana', cellX + 1.5, cellY + 10);
+          pdf.setFontSize(8);
         }
       }
+
+      index += 1;
     }
-  } finally {
-    document.documentElement.setAttribute('data-theme', previousTheme);
-    printableRoot.remove();
   }
+
+  const legendY = gridTop + 8 + (6 * cellH) + 8;
+  drawPdfLegendRow(pdf, x + 2, legendY);
+}
+
+function drawPdfLegendRow(pdf, x, y) {
+  const items = [
+    ['Dia de pratica', [220, 252, 231]],
+    ['Feriado', [254, 243, 199]],
+    ['Recesso', [254, 226, 226]],
+    ['Folga administrativa', [219, 234, 254]],
+    ['Acao pedagogica', [237, 233, 254]],
+  ];
+  let cursorX = x;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  items.forEach(([label, color]) => {
+    pdf.setFillColor(color[0], color[1], color[2]);
+    pdf.setDrawColor(209, 213, 219);
+    pdf.rect(cursorX, y - 3, 4, 4, 'FD');
+    pdf.setTextColor(55, 65, 81);
+    pdf.text(label, cursorX + 6, y);
+    cursorX += 28;
+  });
+}
+
+function pdfBlockFillColor(type) {
+  return {
+    holiday: [254, 243, 199],
+    recess: [254, 226, 226],
+    'admin-leave': [219, 234, 254],
+    training: [237, 233, 254],
+  }[type] || [243, 244, 246];
 }
 
 function drawDetailBox(pdf, x, y, width, title, rows) {

@@ -53,7 +53,7 @@ button {
 }
 button:hover { transform: translateY(-1px); }
 button.secondary, .secondary-btn {
-  background: color-mix(in srgb, var(--brand) 12%, var(--panel));
+  background: var(--panel-soft);
   color: var(--brand-strong);
 }
 button.danger { background: var(--danger); }
@@ -165,7 +165,7 @@ h1 {
 }
 .section-title h2, .guide-panel h3 { margin: 0; }
 .badge {
-  background: color-mix(in srgb, var(--brand) 12%, var(--panel));
+  background: var(--panel-soft);
   color: var(--brand-strong);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -235,7 +235,7 @@ h1 {
   padding: 12px;
 }
 .quota-item label { font-size: .85rem; }
-.guide-panel { background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 5%, var(--panel)) 0%, var(--panel-soft) 100%); }
+.guide-panel { background: linear-gradient(180deg, var(--panel) 0%, var(--panel-soft) 100%); }
 .guide-list {
   margin: 12px 0 0;
   padding-left: 18px;
@@ -300,7 +300,7 @@ h1 {
 }
 .month-card { overflow: hidden; }
 .month-card header {
-  background: color-mix(in srgb, var(--brand) 6%, var(--panel));
+  background: var(--panel-soft);
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
   font-weight: 700;
@@ -320,9 +320,9 @@ h1 {
   font-size: .84rem;
 }
 .weekdays div { color: var(--muted); font-weight: 700; }
-.day { border-top: 1px solid color-mix(in srgb, var(--line) 75%, transparent); min-height: 40px; }
+.day { border-top: 1px solid var(--line); min-height: 40px; }
 .day.muted { opacity: .45; }
-.day.weekend { background: color-mix(in srgb, var(--line) 24%, transparent); }
+.day.weekend { background: var(--panel-soft); }
 .day.phase { background: rgba(22, 163, 74, .18); color: #0d7d49; font-weight: 700; }
 .day.block-holiday { background: rgba(245, 158, 11, .20); }
 .day.block-recess { background: rgba(239, 68, 68, .16); }
@@ -459,7 +459,7 @@ h1 {
 
 .badge-btn {
   cursor: pointer;
-  background: color-mix(in srgb, var(--brand) 12%, var(--panel));
+  background: var(--panel-soft);
   color: var(--brand-strong);
 }
 .badge-btn:hover { transform: translateY(-1px); }
